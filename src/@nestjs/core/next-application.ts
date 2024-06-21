@@ -30,7 +30,11 @@ export class NestApplication {
           const routePath = path.posix.join('/', prefix, pathMetadata)
           this.app[httpMethod.toLowerCase()](routePath, async (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
 
-            const result = await method.call(controller)
+            // 解析方法参数
+            const args = this.resolveParams(controller, methodName, req, res, next);
+            const result = await method.call(controller, ...args)
+
+
             res.send(result)
           })
           // 记录日志：映射路由路径和 HTTP 方法
@@ -53,6 +57,24 @@ export class NestApplication {
 
 
   }
+
+  private resolveParams(instance, methodName, req, res, next) {
+    const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
+    return paramsMetadata.sort((a, b) => a.index - b.index).map((param) => {
+      const { key } = param;
+      switch (key) {
+        case 'Request':
+        case 'Req':
+          return req;
+        default:
+          return null;
+      }
+
+    })
+
+
+  }
+
 
 
 
