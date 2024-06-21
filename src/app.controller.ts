@@ -9,4 +9,9 @@ export class AppController {
     return 'hello'
   }
 
+
+  @Get('info')
+  info() {
+    return 'info'
+  }
 }
