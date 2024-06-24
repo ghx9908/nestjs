@@ -13,6 +13,82 @@
 | ts-node          | 一个 TypeScript 执行引擎，允许直接运行 TypeScript 代码而无需预先编译。                    |
 | tsconfig-paths   | 一个工具，用于解析 TypeScript 配置文件中的路径映射，支持模块路径的别名。                  |
 
+### reflect-metadat
+
+#### 装饰器
+
+在 TypeScript 中，装饰器是一种特殊类型的声明，它能够附加到类声明、方法、访问符、属性或参数上，可以修改类的行为。装饰器是一个实验性的特性，需要在 `tsconfig.json` 文件中启用 `experimentalDecorators` 编译器选项。
+
+**装饰器的类型**
+
+1. **类装饰器（Class Decorators）**：应用于类构造函数，可以用于修改类的定义。
+2. **方法装饰器（Method Decorators）**：应用于方法，可以用于修改方法的行为。
+3. **访问器装饰器（Accessor Decorators）**：应用于类的访问器属性（getter 或 setter）。
+4. **属性装饰器（Property Decorators）**：应用于类的属性。
+5. **参数装饰器（Parameter Decorators）**：应用于方法参数。
+
+| 装饰器名称                          | 装饰器描述                                 | 装饰器的参数说明                                                      |
+| :---------------------------------- | :----------------------------------------- | :-------------------------------------------------------------------- |
+| 类装饰器（Class Decorators）        | 应用于类构造函数，可以用于修改类的定义。   | `constructor: Function`                                               |
+| 方法装饰器（Method Decorators）     | 应用于方法，可以用于修改方法的行为。       | `target: Object, propertyKey: string, descriptor: PropertyDescriptor` |
+| 访问器装饰器（Accessor Decorators） | 应用于类的访问器属性（getter 或 setter）。 | `target: Object, propertyKey: string, descriptor: PropertyDescriptor` |
+| 属性装饰器（Property Decorators）   | 应用于类的属性。                           | `target: Object, propertyKey: string`                                 |
+| 参数装饰器（Parameter Decorators）  | 应用于方法参数。                           | `target: Object, propertyKey: string, parameterIndex: number`         |
+
+#### 类装饰器添加元数据
+
+```ts
+import "reflect-metadata"
+
+interface MoudleMetadata {
+  controllers?: Function[]
+}
+
+// target 为这个类 constructor
+export function Module(metadata: MoudleMetadata): ClassDecorator {
+  return (target: Function) => {
+    Reflect.defineMetadata("controllers", metadata.controllers, target)
+  }
+}
+
+@Module({
+  controllers: [AppController, UserController],
+})
+export class AppModule {}
+
+//  const controllers = Reflect.getMetadata('controllers', this.module) 获取
+```
+
+#### 方法装饰器添加元数据
+
+```ts
+import "reflect-metadata"
+export function Get(path: string = "") {
+  return (target, propertyKey, descriptor: PropertyDescriptor) => {
+    Reflect.defineMetadata("path", path, descriptor.value)
+    Reflect.defineMetadata("method", "GET", descriptor.value)
+  }
+}
+
+//获取  method为这个方法 target为类的原型
+const httpMethod = Reflect.getMetadata("method", method)
+```
+
+#### 参数装饰器添加元数据
+
+```ts
+export const createParamDecorator = (keyOrFactory: string | Function) => {
+  return (attribute?: any) => {
+    return (target, propertyKey, parameterIndex) => {
+      Reflect.defineMetadata(`params:${String(propertyKey)}`, value, target, propertyKey)
+    }
+  }
+}
+
+// 获取   instance 类的实例   methodName方法名 target 为原型对象
+Reflect.getMetadata(`params:${methodName}`, instance, methodName) || []
+```
+
 ### nodemon.json
 
 ```json
@@ -31,34 +107,24 @@
 - **`"ts-node -r tsconfig-paths/register src/main.ts"`**: 表示 `nodemon` 将使用 `ts-node` 执行 `src/main.ts` 文件，并在执行前预加载 `tsconfig-paths/register` 模块以支持路径映射。
 - 综上，`nodemon.json` 文件的配置使得 `nodemon` 工具会监视 `src` 目录中的 `.ts`、`.js` 和 `.json` 文件的变化，忽略 `node_modules` 目录，并在文件变化时自动使用 `ts-node` 执行 `src/main.ts` 文件。
 
-
-
 ### launch.json
 
 ```json
 {
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "type": "node",
-            "request": "launch",
-            "name": "Launch Program",
-            "skipFiles": [
-                "<node_internals>/**"
-            ],
-            "runtimeExecutable": "ts-node",
-            "runtimeArgs": [
-                "-r",
-                "tsconfig-paths/register"
-            ],
-            "args": [
-                "${workspaceFolder}/src/main.ts"
-            ],
-            "cwd": "${workspaceFolder}"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Launch Program",
+      "skipFiles": ["<node_internals>/**"],
+      "runtimeExecutable": "ts-node",
+      "runtimeArgs": ["-r", "tsconfig-paths/register"],
+      "args": ["${workspaceFolder}/src/main.ts"],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
 }
-
 ```
 
 - `version`: 指定配置文件的版本。
@@ -103,11 +169,10 @@
   "scripts": {
     "start": "ts-node -r tsconfig-paths/register ./src/main.ts",
     "start:dev": "nodemon"
-  },
+  }
 }
 ```
 
 - **`ts-node`**: 这是一个用于直接运行 TypeScript 代码的工具，它允许在不预先编译的情况下运行 `.ts` 文件。
 - **`-r tsconfig-paths/register`**: 这里的 `-r` 是 `--require` 的缩写，用于在执行脚本之前预加载模块。`tsconfig-paths/register` 模块用于处理 TypeScript 配置中的路径映射。
 - **`./src/main.ts`**: 这是应用程序的入口文件。`ts-node` 将运行这个 TypeScript 文件。
-
