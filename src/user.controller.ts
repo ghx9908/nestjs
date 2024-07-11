@@ -75,8 +75,8 @@ export class UserController {
   }
   @Get('res')
   handleResponse(@Res() res: ExpressResponse, @Response() response: ExpressResponse) {
-    res.send('Custom response');
-    // return `response`
+    // res.send('Custom response');
+    return `response`
   }
 
   @Get('passthrough')

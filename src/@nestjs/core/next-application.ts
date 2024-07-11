@@ -44,6 +44,7 @@ export class NestApplication {
 
             // 解析方法参数
             const args = this.resolveParams(controller, methodName, req, res, next);
+
             const result = await method.call(controller, ...args)
 
             if (result && result.url) {

@@ -13,8 +13,6 @@ export function Controller(prefixOrOptions?) {
   }
 
   return (target) => {
-
-
     Reflect.defineMetadata('prefix', option.prefix, target)
   }
 
