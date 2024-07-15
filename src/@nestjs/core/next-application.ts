@@ -2,19 +2,68 @@
 import express, { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import { Logger } from './logger';
 import path from 'path'
+import { DESIGN_PARAMTYPES, INJECTED_TOKENS } from '@nestjs/common/constants';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
+  private readonly providers = new Map()
 
   constructor(module: any) {
     this.module = module
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extened: true }))
+    this.initProviders();
+  }
+
+  // 初始化提供者
+  private initProviders() {
+    // 获取当前模块的提供者元数据
+    const providers = Reflect.getMetadata('providers', this.module) || [];
+    // 遍历并添加每个提供者
+    for (const provider of providers) {
+      this.addProvider(provider);
+    }
+  }
+
+  // 添加提供者
+  addProvider(provider) {
+    // 如果提供者有provide和useClass属性
+    if (provider.provide && provider.useClass) {
+      // 解析依赖项
+      const dependencies = this.resolveDependencies(provider.useClass);
+      // 创建类实例
+      const classInstance = new provider.useClass(...dependencies);
+      // 将提供者添加到Map中
+      this.providers.set(provider.provide, classInstance);
+    } else if (provider.provide && provider.useValue) { // 如果提供者有provide和useValue属性
+      // 直接将值添加到Map中
+      this.providers.set(provider.provide, provider.useValue);
+    } else if (provider.provide && provider.useFactory) { // 如果提供者有provide和useFactory属性
+      const inject = provider.inject ?? [];
+      const injectedValues = inject.map(this.getProviderByToken);
+      const value = provider.useFactory(...injectedValues);
+      this.providers.set(provider.provide, value);
+    } else { // 直接是类
+      const dependencies = this.resolveDependencies(provider);
+      this.providers.set(provider, new provider(...dependencies));
+    }
   }
 
 
   use(middleware) {
     this.app.use(middleware)
+  }
+
+  private getProviderByToken = (injectedToken) => {
+    return this.providers.get(injectedToken) ?? injectedToken;
+  }
+  resolveDependencies(Controller) {
+    const injectedTokens = Reflect.getMetadata(INJECTED_TOKENS, Controller) ?? []
+    const constructorParams = Reflect.getMetadata(DESIGN_PARAMTYPES, Controller) ?? []
+    return constructorParams.map((param, index) => {
+      return this.getProviderByToken(injectedTokens[index] ?? param);
+    })
+
   }
   async init() {
 
@@ -23,7 +72,9 @@ export class NestApplication {
     Logger.log('AppModule dependencies initialized', 'InstanceLoader');
 
     for (let Controller of controllers) {
-      const controller = new Controller();
+      const dependencies = this.resolveDependencies(Controller)
+
+      const controller = new Controller(...dependencies);
 
       const prefix = Reflect.getMetadata('prefix', Controller) || '/'
       const controllerPrototype = Reflect.getPrototypeOf(controller)

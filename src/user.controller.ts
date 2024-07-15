@@ -3,10 +3,15 @@
 import { Get, Controller, Req, Request, Query, Headers, Session, Ip, Param, Post, Body, Res, Response, Next, Redirect, HttpCode, Header } from '@nestjs/common'
 import { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { UrlDecorator } from './url-decorator';
+import { LoggerService } from './logger.service'
 @Controller('user')
 export class UserController {
+  constructor() {
+
+  }
   @Get('req')
-  index(@Req('attr') req, age, @Request() request) {
+  index(@Req() req, age, @Request() request) {
+
     console.log('req.method=>', req.method)
     console.log('age=>', age)
     console.log('request.url=>', request.url)
