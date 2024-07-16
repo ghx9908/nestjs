@@ -1,2 +1,1 @@
-export const INJECTED_TOKENS = 'injectedTokens'
-export const DESIGN_PARAMTYPES = 'design:paramtypes'
+export const PARAMTYPES_METADATA = 'design:paramtypes'

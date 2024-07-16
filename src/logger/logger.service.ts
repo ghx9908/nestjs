@@ -20,7 +20,7 @@ export class LoggerService {
 
 
 @Injectable()
-export class UseValueServive {
+export class UseValueService {
   constructor(private prifix: string) {
 
   }

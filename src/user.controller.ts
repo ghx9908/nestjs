@@ -3,7 +3,7 @@
 import { Get, Controller, Req, Request, Query, Headers, Session, Ip, Param, Post, Body, Res, Response, Next, Redirect, HttpCode, Header } from '@nestjs/common'
 import { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import { UrlDecorator } from './url-decorator';
-import { LoggerService } from './logger.service'
+import { LoggerService } from './logger/logger.service'
 @Controller('user')
 export class UserController {
   constructor() {

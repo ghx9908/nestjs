@@ -2,11 +2,11 @@
 import express, { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import { Logger } from './logger';
 import path from 'path'
-import { DESIGN_PARAMTYPES, INJECTED_TOKENS } from '@nestjs/common/constants';
+import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
-  private readonly providers = new Map()
+  private readonly providers = new Map()//全部的providers
 
   constructor(module: any) {
     this.module = module
@@ -17,6 +17,13 @@ export class NestApplication {
 
   // 初始化提供者
   private initProviders() {
+    // 获取模块的导入元数据
+    const imports = Reflect.getMetadata('imports', this.module) || [];
+
+    // 遍历所有导入的模块
+    for (const importedModule of imports) {
+      this.registerProvidersFromModule(importedModule);
+    }
     // 获取当前模块的提供者元数据
     const providers = Reflect.getMetadata('providers', this.module) || [];
     // 遍历并添加每个提供者
@@ -25,8 +32,29 @@ export class NestApplication {
     }
   }
 
+  private registerProvidersFromModule(module) {
+    const providers = Reflect.getMetadata('providers', module) || [];
+    const exports = Reflect.getMetadata('exports', module) || [];
+    for (const exportToken of exports) {
+      if (this.isModule(exportToken)) {
+        this.registerProvidersFromModule(exportToken)
+      } else {
+        const provider = providers.find(provider => provider === exportToken || provider.provide === exportToken);
+        if (provider) this.addProvider(provider);
+      }
+    }
+  }
+  isModule(injectToken) {
+    return injectToken && injectToken instanceof Function && Reflect.getMetadata('isModule', injectToken)
+  }
   // 添加提供者
   addProvider(provider) {
+    // 避免循环依赖
+    const injectToken = provider.provide ?? provider
+    if (this.providers.has(injectToken)) {
+      return
+    }
+
     // 如果提供者有provide和useClass属性
     if (provider.provide && provider.useClass) {
       // 解析依赖项
@@ -58,8 +86,8 @@ export class NestApplication {
     return this.providers.get(injectedToken) ?? injectedToken;
   }
   resolveDependencies(Controller) {
-    const injectedTokens = Reflect.getMetadata(INJECTED_TOKENS, Controller) ?? []
-    const constructorParams = Reflect.getMetadata(DESIGN_PARAMTYPES, Controller) ?? []
+    const injectedTokens = Reflect.getMetadata('injectedTokens', Controller) ?? []
+    const constructorParams = Reflect.getMetadata(PARAMTYPES_METADATA, Controller) ?? []
     return constructorParams.map((param, index) => {
       return this.getProviderByToken(injectedTokens[index] ?? param);
     })

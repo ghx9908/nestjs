@@ -181,3 +181,5 @@ Reflect.getMetadata(`params:${methodName}`, instance, methodName) || []
 - **`ts-node`**: 这是一个用于直接运行 TypeScript 代码的工具，它允许在不预先编译的情况下运行 `.ts` 文件。
 - **`-r tsconfig-paths/register`**: 这里的 `-r` 是 `--require` 的缩写，用于在执行脚本之前预加载模块。`tsconfig-paths/register` 模块用于处理 TypeScript 配置中的路径映射。
 - **`./src/main.ts`**: 这是应用程序的入口文件。`ts-node` 将运行这个 TypeScript 文件。
+
+## 核心模块
