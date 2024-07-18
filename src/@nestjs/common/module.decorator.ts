@@ -1,14 +1,14 @@
 
 import 'reflect-metadata'
 
-interface MoudleMetadata {
+interface ModuleMetadata {
   controllers?: Function[]
   providers?: any
   exports?: any[];//模块的导出 把自己的一部分provides 导出
   imports?: any[]; // 导入别的模块
 }
 
-export function Module(metadata: MoudleMetadata): ClassDecorator {
+export function Module(metadata: ModuleMetadata): ClassDecorator {
   return (target: Function) => {
     Reflect.defineMetadata('isModule', true, target);
     Reflect.defineMetadata('controllers', metadata.controllers, target)
@@ -20,8 +20,6 @@ export function Module(metadata: MoudleMetadata): ClassDecorator {
   }
 }
 
-
-
 export function defineModule(nestModule, targets = []) {
   //遍历targets数组，为每个元素添加元数据，key是nestModule,值是对应的模块
   targets.forEach(target => {
@@ -32,4 +30,8 @@ export function Global(): ClassDecorator {
   return (target: Function) => {
     Reflect.defineMetadata('global', true, target);
   };
+}
+
+export interface DynamicModule extends ModuleMetadata {
+  module: Function;
 }

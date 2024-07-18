@@ -2,6 +2,7 @@
 
 - 英文文档： https://nestjs.com/
 - 中文文档：https://nest.nodejs.cn/
+  https://nestjs.inode.club/
 
 ## 基本知识
 

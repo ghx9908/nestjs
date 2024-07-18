@@ -3,6 +3,7 @@ import express, { Express, Request as ExpressRequest, Response as ExpressRespons
 import { Logger } from './logger';
 import path from 'path'
 import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
+import { defineModule } from '../common';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
@@ -23,8 +24,23 @@ export class NestApplication {
     const imports = Reflect.getMetadata('imports', this.module) || [];
 
     // 遍历所有导入的模块
-    for (const importedModule of imports) {
-      this.registerProvidersFromModule(importedModule, this.module);
+    for (const importModule of imports) {
+      if (importModule.module) {
+        const { module, providers, exports, controllers } = importModule;
+        const oldProvide = Reflect.getMetadata('providers', module) ?? [];;
+        const oldControllers = Reflect.getMetadata('controllers', module) ?? [];
+        const oldImports = Reflect.getMetadata('imports', module) ?? [];
+        const oldExports = Reflect.getMetadata('exports', module) ?? [];
+        defineModule(this.module, providers);
+        defineModule(this.module, controllers);
+        Reflect.defineMetadata('controllers', [...oldControllers, ...controllers ?? []], module);
+        Reflect.defineMetadata('providers', [...oldProvide, ...providers ?? []], module);
+        Reflect.defineMetadata('imports', [...oldImports, ...imports ?? []], module);
+        Reflect.defineMetadata('exports', [...oldExports, ...exports ?? []], module);
+        this.registerProvidersFromModule(module, this.module);
+      } else {
+        this.registerProvidersFromModule(importModule, this.module);
+      }
     }
     // 获取当前模块的提供者元数据
     const providers = Reflect.getMetadata('providers', this.module) || [];

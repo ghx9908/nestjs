@@ -4,11 +4,13 @@ import { Get, Controller, Inject } from '@nestjs/common'
 import { LoggerClassService, LoggerService, UseFactory, UseValueService } from './logger/logger.service'
 import { CommonService } from './common/common.service'
 import { OtherService } from './other/other.service'
+import { AppService } from './app.service'
 
 
 @Controller()
 export class AppController {
   constructor(
+    private readonly appService: AppService,
     private otherService: OtherService,
     private commonService: CommonService,
     private loggerService: LoggerService,
@@ -17,8 +19,15 @@ export class AppController {
     @Inject('FactoryToken') private usFeactoryToken: UseFactory,
   ) { }
 
-  @Get()
-  index() {
+
+  @Get('config')
+  getConfig(): string {
+    const config = this.appService.getConfig();
+    return `Config Options: ${config}`;
+  }
+
+  @Get('module')
+  module() {
     this.otherService.log('index')
     return 'hello'
   }
