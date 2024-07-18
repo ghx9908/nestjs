@@ -14,7 +14,7 @@ export function Module(metadata: ModuleMetadata): ClassDecorator {
     Reflect.defineMetadata('controllers', metadata.controllers, target)
     defineModule(target, metadata.controllers);
     Reflect.defineMetadata('providers', metadata.providers, target)
-    defineModule(target, metadata.providers ?? []);
+    defineModule(target, (metadata.providers ?? []).map(provider => provider instanceof Function ? provider : provider.useClass).filter(Boolean));
     Reflect.defineMetadata('exports', metadata.exports, target);
     Reflect.defineMetadata('imports', metadata.imports, target);
   }

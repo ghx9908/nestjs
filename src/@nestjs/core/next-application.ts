@@ -62,6 +62,7 @@ export class NestApplication {
         });
       }
     }
+    this.middlewares.length = 0;
     return this;
   }
   exclude(...routes: any[]): this {
