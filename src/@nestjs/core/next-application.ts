@@ -44,10 +44,17 @@ export class NestApplication {
             return next();
           }
           if ((routeMethod === RequestMethod.ALL || routeMethod === req.method)) {
-            defineModule(this.module, middleware);
-            const dependencies = this.resolveDependencies(middleware);
-            const middlewareInstance = new middleware(...dependencies);
-            middlewareInstance.use(req, res, next);
+            if (typeof middleware === 'function' && middleware.prototype && 'use' in middleware.prototype) {
+              defineModule(this.module, middleware);
+              const dependencies = this.resolveDependencies(middleware);
+              const middlewareInstance = new middleware(...dependencies);
+              middlewareInstance.use(req, res, next);
+            } else if (typeof middleware === 'function') {
+              middleware(req, res, next);
+            } else {
+
+              next();
+            }
           } else {
             next();
           }

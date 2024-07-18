@@ -8,6 +8,7 @@ import { CommonModule } from './common/common.module';
 import { AppService } from './app.service';
 import { DynamicConfigModule } from './dynamicConfig.module';
 import { LoggerMiddleware } from './logger.middleware';
+import { logger } from './logger.function.middleware';
 @Module({
   controllers: [AppController, UserController,],
   imports: [LoggerModule, CoreModule, OtherModule, CommonModule, DynamicConfigModule.forRoot({ apiKey: '456' })],
@@ -17,7 +18,8 @@ import { LoggerMiddleware } from './logger.middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      .apply(LoggerMiddleware)
+      // .apply(LoggerMiddleware)
+      .apply(logger, LoggerMiddleware)
       // .forRoutes({ path: 'middleware', method: RequestMethod.GET })
       // .forRoutes('ab*de');
       .exclude(
