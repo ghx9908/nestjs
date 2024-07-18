@@ -4,18 +4,57 @@ import { Logger } from './logger';
 import path from 'path'
 import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
 import { defineModule } from '../common';
+import { RequestMethod } from '@nestjs/common/request-method.enum';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
   private readonly providerInstances = new Map();// 所有的privater的实例
   private readonly globalProviders = new Set();//全局的privader
   private readonly moduleProviders = new Map(); //模块对应的private token
-
+  private readonly middlewares = []
   constructor(module: any) {
     this.module = module
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extened: true }))
     this.initProviders();
+    this.initMiddlewares();
+  }
+
+  private initMiddlewares() {
+    this.module.prototype.configure?.(this);
+  }
+  apply(...middleware: (Function | any)[]): this {
+    this.middlewares.push(...middleware);
+    return this;
+  }
+  forRoutes(...routes: any[]): this {
+    for (const route of routes) {
+      for (const middleware of this.middlewares) {
+        const { routePath, routeMethod } = this.normalizeRouteInfo(route);
+        this.app.use(routePath, (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+
+          if ((routeMethod === RequestMethod.ALL || routeMethod === req.method)) {
+            const middlewareInstance = new middleware();
+            middlewareInstance.use(req, res, next);
+          } else {
+            next();
+          }
+        });
+      }
+    }
+    return this;
+  }
+  private normalizeRouteInfo(route) {
+    let routePath = '';
+    let routeMethod = RequestMethod.ALL;
+    if (typeof route === 'string') {
+      routePath = route;
+    } else if ('path' in route) {
+      routePath = route.path;
+      routeMethod = route.method ?? RequestMethod.ALL;
+    }
+    routePath = path.posix.join('/', routePath);
+    return { routePath, routeMethod };
   }
 
   // 初始化提供者

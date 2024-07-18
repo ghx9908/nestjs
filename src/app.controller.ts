@@ -1,6 +1,6 @@
 
 
-import { Get, Controller, Inject } from '@nestjs/common'
+import { Get, Controller, Inject, Req } from '@nestjs/common'
 import { LoggerClassService, LoggerService, UseFactory, UseValueService } from './logger/logger.service'
 import { CommonService } from './common/common.service'
 import { OtherService } from './other/other.service'
@@ -20,6 +20,10 @@ export class AppController {
   ) { }
 
 
+  @Get('middleware')
+  middleware(@Req() req): string {
+    return `middleware ${req.url}`;
+  }
   @Get('config')
   getConfig(): string {
     const config = this.appService.getConfig();
