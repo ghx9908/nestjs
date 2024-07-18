@@ -2,9 +2,8 @@
 import express, { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import { Logger } from './logger';
 import path from 'path'
-import { PARAMTYPES_METADATA } from '@nestjs/common/constants';
-import { defineModule } from '../common';
-import { RequestMethod } from '@nestjs/common/request-method.enum';
+import { RequestMethod, defineModule, GlobalHttpExceptionFilter, PARAMTYPES_METADATA, ArgumentsHost } from '../common';
+import { ExceptionFilter } from '@nestjs/common';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
@@ -13,6 +12,8 @@ export class NestApplication {
   private readonly moduleProviders = new Map(); //模块对应的private token
   private readonly middlewares = []
   private readonly excludedRoutes = []
+  private readonly defaultGlobalHttpExceptionFilter = new GlobalHttpExceptionFilter()
+  private readonly globalHttpExceptionFilters: ExceptionFilter[] = [];
   constructor(module: any) {
     this.module = module
     this.app.use(express.json())
@@ -205,7 +206,7 @@ export class NestApplication {
       const prefix = Reflect.getMetadata('prefix', Controller) || '/'
       const controllerPrototype = Reflect.getPrototypeOf(controller)
       Logger.log(`${Controller.name} {${prefix}}:`, 'RoutesResolver');
-
+      const controllerFilters = Reflect.getMetadata('filters', Controller) || [];
       for (let methodName of Object.getOwnPropertyNames(controllerPrototype)) {
         const method = controller[methodName]
         const pathMetadata = Reflect.getMetadata('path', method)
@@ -214,39 +215,49 @@ export class NestApplication {
         const redirectStatusCode = Reflect.getMetadata('redirectStatusCode', method);
         const httpCode = Reflect.getMetadata('httpCode', method);
         const headers = Reflect.getMetadata('headers', method) || [];
-
+        const methodFilters = Reflect.getMetadata('filters', method) || [];
         if (httpMethod) {
           const routePath = path.posix.join('/', prefix, pathMetadata)
+          const filters = [...controllerFilters, ...methodFilters];
           this.app[httpMethod.toLowerCase()](routePath, async (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
+            const host: ArgumentsHost = {
+              switchToHttp: () => ({
+                getRequest: () => req,
+                getResponse: () => res,
+                getNext: () => next,
+              }),
+            };
+            try {
+              // 解析方法参数
+              const args = this.resolveParams(controller, methodName, req, res, next, host);
 
-            // 解析方法参数
-            const args = this.resolveParams(controller, methodName, req, res, next);
+              const result = await method.call(controller, ...args)
 
-            const result = await method.call(controller, ...args)
+              if (result && result.url) {
+                res.redirect(result.statusCode || 302, result.url);
+                return;
+              }
+              if (redirectUrl) {
+                res.redirect(redirectStatusCode || 302, redirectUrl);
+                return;
+              }
+              if (httpCode) {
+                res.status(httpCode);
+              } else if (httpMethod === 'POST') {
+                res.status(201);
+              }
 
-            if (result && result.url) {
-              res.redirect(result.statusCode || 302, result.url);
-              return;
+              const responseMeta = this.getResponseMetadata(controller, methodName);
+              if (!responseMeta || (responseMeta.attribute?.passthrough)) {
+                headers.forEach((header: { name: string; value: string }) => {
+                  res.setHeader(header.name, header.value);
+                });
+
+                return res.send(result);
+              }
+            } catch (error) {
+              await this.callExceptionFilters(error, host, filters);
             }
-            if (redirectUrl) {
-              res.redirect(redirectStatusCode || 302, redirectUrl);
-              return;
-            }
-            if (httpCode) {
-              res.status(httpCode);
-            } else if (httpMethod === 'POST') {
-              res.status(201);
-            }
-
-            const responseMeta = this.getResponseMetadata(controller, methodName);
-            if (!responseMeta || (responseMeta.attribute?.passthrough)) {
-              headers.forEach((header: { name: string; value: string }) => {
-                res.setHeader(header.name, header.value);
-              });
-
-              return res.send(result);
-            }
-
           })
           // 记录日志：映射路由路径和 HTTP 方法
           Logger.log(`Mapped {${routePath}, ${httpMethod}} route`, 'RouterExplorer');
@@ -255,21 +266,39 @@ export class NestApplication {
     }
   }
 
+  useGlobalFilters(...filters: ExceptionFilter[]): void {
+    this.globalHttpExceptionFilters.push(...filters);
+  }
+  getFilterInstance(filter) {
+    if (filter instanceof Function) {
+      const dependencies = this.resolveDependencies(filter);
+      console.log('dependencies', dependencies);
+      return new filter(...dependencies);
+    }
+    return filter;
+  }
+  private async callExceptionFilters(error: any, host: ArgumentsHost, filters: ExceptionFilter[] = []) {
+    const allFilters = [...filters, ...this.globalHttpExceptionFilters, this.defaultGlobalHttpExceptionFilter];
+    for (const filter of allFilters) {
+      let filterInstance = this.getFilterInstance(filter);
+      const exceptions = Reflect.getMetadata('catch', filterInstance.constructor) || [];
+      if (exceptions.length == 0 || exceptions.some((exception: any) => error instanceof exception)) {
+        console.log('filter=>', filter)
+        filterInstance.catch(error, host);
+        break;
+      }
+    }
+  }
+
   private getResponseMetadata(instance: any, methodName: string): any {
     const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
     return paramsMetadata.filter(Boolean).find((param: any) => param.key === 'Res' || param.key === 'Response' || param.key === 'Next');
   }
-  private resolveParams(instance, methodName, req, res, next) {
+  private resolveParams(instance, methodName, req, res, next, host) {
     const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
     return paramsMetadata.map((param) => {
       const { key, attribute } = param;
-      const ctx = {
-        switchToHttp: () => ({
-          getRequest: () => req,
-          getResponse: () => res,
-          getNext: () => next,
-        }),
-      }
+
       switch (key) {
         case 'Request':
         case 'Req':
@@ -292,7 +321,7 @@ export class NestApplication {
         case 'Next':
           return next;
         case 'DecoratorFactory':
-          return param.factory(attribute, ctx);
+          return param.factory(attribute, host);
         default:
           return null;
       }

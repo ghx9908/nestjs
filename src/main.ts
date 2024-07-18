@@ -1,13 +1,13 @@
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 
-
+import { CustomExceptionFilter } from './custom-exception.filter';
 // 导入 express-session 中间件，用于管理会话
 import session from 'express-session';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule)
-
+  app.useGlobalFilters(new CustomExceptionFilter());
   // 使用 express-session 中间件来管理会话
   app.use(session({
     // 定义用于加密会话的密钥
