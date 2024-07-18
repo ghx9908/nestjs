@@ -22,7 +22,7 @@ export function Module(metadata: ModuleMetadata): ClassDecorator {
 
 export function defineModule(nestModule, targets = []) {
   //遍历targets数组，为每个元素添加元数据，key是nestModule,值是对应的模块
-  targets.forEach(target => {
+  (Array.isArray(targets) ? targets : [targets]).forEach(target => {
     Reflect.defineMetadata('module', nestModule, target);
   })
 }

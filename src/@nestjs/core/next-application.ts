@@ -12,6 +12,7 @@ export class NestApplication {
   private readonly globalProviders = new Set();//全局的privader
   private readonly moduleProviders = new Map(); //模块对应的private token
   private readonly middlewares = []
+  private readonly excludedRoutes = []
   constructor(module: any) {
     this.module = module
     this.app.use(express.json())
@@ -27,14 +28,25 @@ export class NestApplication {
     this.middlewares.push(...middleware);
     return this;
   }
+
+  private isExcluded(reqPath: string, method: RequestMethod): boolean {
+    return this.excludedRoutes.some(route => {
+      const { routePath, routeMethod } = this.normalizeRouteInfo(route);
+      return routePath === reqPath && (routeMethod === RequestMethod.ALL || routeMethod === method);
+    });
+  }
   forRoutes(...routes: any[]): this {
     for (const route of routes) {
       for (const middleware of this.middlewares) {
         const { routePath, routeMethod } = this.normalizeRouteInfo(route);
         this.app.use(routePath, (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
-
+          if (this.isExcluded(req.originalUrl, req.method)) {
+            return next();
+          }
           if ((routeMethod === RequestMethod.ALL || routeMethod === req.method)) {
-            const middlewareInstance = new middleware();
+            defineModule(this.module, middleware);
+            const dependencies = this.resolveDependencies(middleware);
+            const middlewareInstance = new middleware(...dependencies);
             middlewareInstance.use(req, res, next);
           } else {
             next();
@@ -42,6 +54,10 @@ export class NestApplication {
         });
       }
     }
+    return this;
+  }
+  exclude(...routes: any[]): this {
+    this.excludedRoutes.push(...routes);
     return this;
   }
   private normalizeRouteInfo(route) {
@@ -52,6 +68,9 @@ export class NestApplication {
     } else if ('path' in route) {
       routePath = route.path;
       routeMethod = route.method ?? RequestMethod.ALL;
+    }
+    else if (route instanceof Function) {
+      routePath = Reflect.getMetadata('prefix', route) || '';
     }
     routePath = path.posix.join('/', routePath);
     return { routePath, routeMethod };

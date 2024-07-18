@@ -24,6 +24,10 @@ export class AppController {
   middleware(@Req() req): string {
     return `middleware ${req.url}`;
   }
+  @Get('abcde')
+  abcde(): string {
+    return `abcde`;
+  }
   @Get('config')
   getConfig(): string {
     const config = this.appService.getConfig();
