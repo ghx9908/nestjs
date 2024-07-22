@@ -1,8 +1,11 @@
-import { DefaultValuePipe } from "@nestjs/common";
+import { Body, DefaultValuePipe, Post, UsePipes } from "@nestjs/common";
 import { Controller, Get, Param, ParseArrayPipe, ParseBoolPipe, ParseFloatPipe, ParseIntPipe, Query } from "@nestjs/common";
 import { CustomPipe } from './custom.pipe';
+import { ZodValidationPipe } from "./zod-validation.pipe";
+import { CreateCatDto, createCatSchema } from "./create-cat.dto";
 
-
+import { ClassValidationPipe } from './class-validation.pipe';
+import { CreateUserDto } from './create-user.dto';
 @Controller('pipe')
 export class PipeController {
 
@@ -35,6 +38,23 @@ export class PipeController {
   @Get('custom/:value')
   getCustom(@Param('value', CustomPipe) value: any): string {
     return `The custom value is ${value}`;
+  }
+  @Post('cat')
+  @UsePipes(new ZodValidationPipe(createCatSchema))
+  async create(@Body() createCatDto: CreateCatDto) {
+    return `This is a cat`;
+  }
+
+  @Post('user')
+  async userCreate(@Body(new ClassValidationPipe()) createUserDto: CreateUserDto) {
+    console.log('createUserDto', createUserDto);
+    return 'This action adds a new user';
+  }
+
+  @Post('users/global')
+  async createGlobalUser(@Body() createUserDto: CreateUserDto): Promise<string> {
+    console.log('Global Create User DTO:', createUserDto);
+    return 'This action adds a new user globally';
   }
 
 }

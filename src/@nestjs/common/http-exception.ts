@@ -4,6 +4,7 @@ export class HttpException extends Error {
   private readonly status: HttpStatus;
 
   constructor(response: string | object, status: HttpStatus) {
+    console.log('response=>', response)
     super();
     this.response = response;
     this.status = status;
@@ -19,6 +20,7 @@ export class HttpException extends Error {
 }
 export class BadRequestException extends HttpException {
   constructor(message: string, error?: string) {
+    console.log('message=>', message)
     super({ message, error, statusCode: HttpStatus.BAD_REQUEST }, HttpStatus.BAD_REQUEST);
   }
 }

@@ -5,11 +5,16 @@ import 'reflect-metadata'
 export const createParamDecorator = (keyOrFactory: string | Function) => {
   return (attribute?: any, ...pipes: any[]) => {
     return (target, propertyKey, parameterIndex) => {
+      if (attribute && typeof attribute === 'object' && attribute.transform) {
+        pipes.unshift(attribute); // 将 data 插入到 pipes 的最前面
+        attribute = undefined; // 将 data 置为 undefined
+      }
       const existingParameters = Reflect.getMetadata(`params:${String(propertyKey)}`, target, propertyKey) || [];
+      const metatype = Reflect.getMetadata('design:paramtypes', target, propertyKey)[parameterIndex];
       if (keyOrFactory instanceof Function) {
-        existingParameters[parameterIndex] = { index: parameterIndex, key: 'DecoratorFactory', factory: keyOrFactory, attribute, pipes };
+        existingParameters[parameterIndex] = { index: parameterIndex, key: 'DecoratorFactory', factory: keyOrFactory, attribute, pipes, metatype };
       } else {
-        existingParameters[parameterIndex] = { index: parameterIndex, key: keyOrFactory, attribute, pipes };
+        existingParameters[parameterIndex] = { index: parameterIndex, key: keyOrFactory, attribute, pipes, metatype };
       }
       Reflect.defineMetadata(`params:${String(propertyKey)}`, existingParameters, target, propertyKey);
     }

@@ -12,6 +12,7 @@ export class NestApplication {
   private readonly moduleProviders = new Map(); //模块对应的private token
   private readonly middlewares = []
   private readonly excludedRoutes = []
+  private readonly globalPipes = [];
   private readonly defaultGlobalHttpExceptionFilter = new GlobalHttpExceptionFilter()
   private readonly globalHttpExceptionFilters: ExceptionFilter[] = [];
   constructor(module: any) {
@@ -207,6 +208,7 @@ export class NestApplication {
       const controllerPrototype = Reflect.getPrototypeOf(controller)
       Logger.log(`${Controller.name} {${prefix}}:`, 'RoutesResolver');
       const controllerFilters = Reflect.getMetadata('filters', Controller) || [];
+      const controllerPipes = Reflect.getMetadata('pipes', Controller) || [];
       for (let methodName of Object.getOwnPropertyNames(controllerPrototype)) {
         const method = controller[methodName]
         const pathMetadata = Reflect.getMetadata('path', method)
@@ -216,6 +218,9 @@ export class NestApplication {
         const httpCode = Reflect.getMetadata('httpCode', method);
         const headers = Reflect.getMetadata('headers', method) || [];
         const methodFilters = Reflect.getMetadata('filters', method) || [];
+        const methodPipes = Reflect.getMetadata('pipes', method) || [];
+
+        const pipes = [...controllerPipes, ...methodPipes];
         if (httpMethod) {
           const routePath = path.posix.join('/', prefix, pathMetadata)
           const filters = [...controllerFilters, ...methodFilters];
@@ -228,8 +233,9 @@ export class NestApplication {
               }),
             };
             try {
+
               // 解析方法参数
-              const args = await Promise.all(this.resolveParams(controller, methodName, req, res, next, host))
+              const args = await Promise.all(this.resolveParams(controller, methodName, req, res, next, host, pipes))
 
               const result = await method.call(controller, ...args)
 
@@ -294,10 +300,10 @@ export class NestApplication {
     const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
     return paramsMetadata.filter(Boolean).find((param: any) => param.key === 'Res' || param.key === 'Response' || param.key === 'Next');
   }
-  private resolveParams(instance, methodName, req, res, next, host) {
+  private resolveParams(instance, methodName, req, res, next, host, pipes) {
     const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
     return paramsMetadata.map(async (param) => {
-      const { key, attribute, pipes } = param;
+      const { key, attribute, pipes: paramPipes, metatype } = param;
       let value;
       switch (key) {
         case 'Request':
@@ -335,14 +341,17 @@ export class NestApplication {
           value = null;
           break;
       }
-      for (const pipe of [...pipes]) {
+      for (const pipe of [...this.globalPipes, ...pipes, ...paramPipes]) {
         const pipeInstance = await this.resolvePipe(pipe);
-        value = await pipeInstance.transform(value, { type: key, data: attribute });
+        value = await pipeInstance.transform(value, { type: key, data: attribute, metatype });
       }
       return value;
     })
   }
 
+  useGlobalPipes(...pipes): void {
+    this.globalPipes.push(...pipes);
+  }
   private async resolvePipe(pipe: any): Promise<any> {
     if (typeof pipe === 'function') {
       const dependencies = this.resolveDependencies(pipe);

@@ -20,3 +20,5 @@ export * from './use-filters.decorator';
 export * from './pipe-transform.interface';
 export * from './pipes';
 export * from './argument-metadata.interface';
+export * from './use-pipes.decorator';
+export * from './validation-pipe';
