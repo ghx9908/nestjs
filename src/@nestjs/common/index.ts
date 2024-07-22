@@ -17,3 +17,6 @@ export * from './http-methods.decorator';
 export * from './http-exception';
 export * from './http-status.enum';
 export * from './use-filters.decorator';
+export * from './pipe-transform.interface';
+export * from './pipes';
+export * from './argument-metadata.interface';

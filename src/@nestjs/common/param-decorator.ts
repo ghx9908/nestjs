@@ -3,13 +3,13 @@
 import 'reflect-metadata'
 
 export const createParamDecorator = (keyOrFactory: string | Function) => {
-  return (attribute?: any) => {
+  return (attribute?: any, ...pipes: any[]) => {
     return (target, propertyKey, parameterIndex) => {
       const existingParameters = Reflect.getMetadata(`params:${String(propertyKey)}`, target, propertyKey) || [];
       if (keyOrFactory instanceof Function) {
-        existingParameters[parameterIndex] = { index: parameterIndex, key: 'DecoratorFactory', factory: keyOrFactory, attribute };
+        existingParameters[parameterIndex] = { index: parameterIndex, key: 'DecoratorFactory', factory: keyOrFactory, attribute, pipes };
       } else {
-        existingParameters[parameterIndex] = { index: parameterIndex, key: keyOrFactory, attribute };
+        existingParameters[parameterIndex] = { index: parameterIndex, key: keyOrFactory, attribute, pipes };
       }
       Reflect.defineMetadata(`params:${String(propertyKey)}`, existingParameters, target, propertyKey);
     }

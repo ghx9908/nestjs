@@ -18,8 +18,7 @@ export class NestApplication {
     this.module = module
     this.app.use(express.json())
     this.app.use(express.urlencoded({ extened: true }))
-    this.initProviders();
-    this.initMiddlewares();
+
   }
 
   private initMiddlewares() {
@@ -230,7 +229,7 @@ export class NestApplication {
             };
             try {
               // 解析方法参数
-              const args = this.resolveParams(controller, methodName, req, res, next, host);
+              const args = await Promise.all(this.resolveParams(controller, methodName, req, res, next, host))
 
               const result = await method.call(controller, ...args)
 
@@ -297,38 +296,63 @@ export class NestApplication {
   }
   private resolveParams(instance, methodName, req, res, next, host) {
     const paramsMetadata = Reflect.getMetadata(`params:${methodName}`, instance, methodName) || [];
-    return paramsMetadata.map((param) => {
-      const { key, attribute } = param;
-
+    return paramsMetadata.map(async (param) => {
+      const { key, attribute, pipes } = param;
+      let value;
       switch (key) {
         case 'Request':
         case 'Req':
-          return req;
+          value = req;
+          break;
         case 'Query':
-          return attribute ? req.query[attribute] : req.query;
+          value = attribute ? req.query[attribute] : req.query;
+          break;
         case 'Headers':
-          return attribute ? req.headers[attribute] : req.headers;
+          value = attribute ? req.headers[attribute] : req.headers;
         case 'Session':
-          return req.session;
+          value = req.session;
+          break;
         case 'Ip':
-          return req.ip;
+          value = req.ip;
+          break;
         case 'Param':
-          return attribute ? req.params[attribute] : req.params;
+          value = attribute ? req.params[attribute] : req.params;
+          break;
         case 'Body':
-          return attribute ? req.body[attribute] : req.body;
+          value = attribute ? req.body[attribute] : req.body;
+          break;
         case 'Response':
         case 'Res':
-          return res;
+          value = res;
+          break;
         case 'Next':
-          return next;
+          value = next;
+          break;
         case 'DecoratorFactory':
-          return param.factory(attribute, host);
+          value = param.factory(attribute, host);
+          break;
         default:
-          return null;
+          value = null;
+          break;
       }
+      for (const pipe of [...pipes]) {
+        const pipeInstance = await this.resolvePipe(pipe);
+        value = await pipeInstance.transform(value, { type: key, data: attribute });
+      }
+      return value;
     })
   }
+
+  private async resolvePipe(pipe: any): Promise<any> {
+    if (typeof pipe === 'function') {
+      const dependencies = this.resolveDependencies(pipe);
+      return new pipe(...dependencies);
+    }
+    return pipe;
+  }
   async listen(port: number) {
+    await this.initProviders();
+    await this.initMiddlewares();
     await this.init()
     this.app.listen(port, () => {
       Logger.log(`Application is running on: http://localhost:${port}`, 'NestApplication');

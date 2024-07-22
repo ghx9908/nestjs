@@ -9,8 +9,9 @@ import { AppService } from './app.service';
 import { DynamicConfigModule } from './dynamicConfig.module';
 import { LoggerMiddleware } from './logger.middleware';
 import { logger } from './logger.function.middleware';
+import { PipeController } from './pipe.controller';
 @Module({
-  controllers: [AppController, UserController,],
+  controllers: [AppController, UserController, PipeController],
   imports: [LoggerModule, CoreModule, OtherModule, CommonModule, DynamicConfigModule.forRoot({ apiKey: '456' })],
   providers: [AppService]
 }
@@ -18,13 +19,13 @@ import { logger } from './logger.function.middleware';
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
-      // .apply(LoggerMiddleware)
-      .apply(logger, LoggerMiddleware)
+      .apply(LoggerMiddleware)
+      // .apply(logger, LoggerMiddleware)
       // .forRoutes({ path: 'middleware', method: RequestMethod.GET })
-      // .forRoutes('ab*de');
-      .exclude(
-        { path: 'config', method: RequestMethod.GET },
-      )
-      .forRoutes(AppController);
+      .forRoutes('ab*de');
+    // .exclude(
+    //   { path: 'config', method: RequestMethod.GET },
+    // )
+    // .forRoutes(AppController);
   }
 }
