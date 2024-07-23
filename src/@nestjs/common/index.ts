@@ -22,3 +22,7 @@ export * from './pipes';
 export * from './argument-metadata.interface';
 export * from './use-pipes.decorator';
 export * from './validation-pipe';
+export * from './use-guards.decorator';
+export * from './can-activate.interface';
+export * from './execution-context.interface';
+export * from './set-metadata.decorator';

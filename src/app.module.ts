@@ -10,8 +10,9 @@ import { DynamicConfigModule } from './dynamicConfig.module';
 import { LoggerMiddleware } from './logger.middleware';
 import { logger } from './logger.function.middleware';
 import { PipeController } from './pipe.controller';
+import { AccountController } from './account.controller';
 @Module({
-  controllers: [AppController, UserController, PipeController],
+  controllers: [AppController, UserController, PipeController, AccountController],
   imports: [LoggerModule, CoreModule, OtherModule, CommonModule, DynamicConfigModule.forRoot({ apiKey: '456' })],
   providers: [AppService]
 }

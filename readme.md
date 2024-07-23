@@ -209,3 +209,7 @@ Reflect.getMetadata(`params:${methodName}`, instance, methodName) || []
 
 - 转型：将输入数据转换为所需的形式（例如，从字符串到整数）
 - 验证：评估输入数据，如果有效，只需将其原样传递；否则抛出异常
+
+### 守卫
+
+> 守卫是一个用 @Injectable() 装饰器注释的类，它实现了 CanActivate 接口。

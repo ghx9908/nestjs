@@ -2,8 +2,9 @@
 import express, { Express, Request as ExpressRequest, Response as ExpressResponse, NextFunction } from 'express';
 import { Logger } from './logger';
 import path from 'path'
-import { RequestMethod, defineModule, GlobalHttpExceptionFilter, PARAMTYPES_METADATA, ArgumentsHost } from '../common';
+import { RequestMethod, defineModule, GlobalHttpExceptionFilter, PARAMTYPES_METADATA, ArgumentsHost, ExecutionContext, CanActivate, ForbiddenException, FORBIDDEN_MESSAGE } from '../common';
 import { ExceptionFilter } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 export class NestApplication {
   private readonly app: Express = express()
   private readonly module: any
@@ -85,8 +86,13 @@ export class NestApplication {
     return { routePath, routeMethod };
   }
 
+  private addCoreProviders() {
+    this.addProvider(Reflector, this.module, true);
+  }
+
   // 初始化提供者
   private initProviders() {
+    this.addCoreProviders();
     // 获取模块的导入元数据
     const imports = Reflect.getMetadata('imports', this.module) || [];
 
@@ -133,6 +139,7 @@ export class NestApplication {
         }
       }
     }
+    this.initController(module);
   }
   isModule(injectToken) {
     return injectToken && injectToken instanceof Function && Reflect.getMetadata('isModule', injectToken)
@@ -194,21 +201,36 @@ export class NestApplication {
     })
 
   }
-  async init() {
-    const controllers = Reflect.getMetadata('controllers', this.module)
+  private getGuardInstance(guard: CanActivate | Function): CanActivate {
+    if (typeof guard === 'function') {
+      const dependencies = this.resolveDependencies(guard);
+      return new (guard as any)(...dependencies);
+    }
+    return guard as CanActivate;
+  }
+  private async callGuards(guards: CanActivate[], context: ExecutionContext) {
+    for (const guard of guards) {
+      const guardInstance = this.getGuardInstance(guard);
+      const canActivate = await guardInstance.canActivate(context);
+      if (!canActivate) {
+        throw new ForbiddenException(FORBIDDEN_MESSAGE);
+      }
+    }
+  }
+  async initController(module) {
+    const controllers = Reflect.getMetadata('controllers', module) || [];
     // 记录日志：应用模块依赖已初始化
     Logger.log('AppModule dependencies initialized', 'InstanceLoader');
 
     for (let Controller of controllers) {
       const dependencies = this.resolveDependencies(Controller)
-
       const controller = new Controller(...dependencies);
-
       const prefix = Reflect.getMetadata('prefix', Controller) || '/'
       const controllerPrototype = Reflect.getPrototypeOf(controller)
       Logger.log(`${Controller.name} {${prefix}}:`, 'RoutesResolver');
       const controllerFilters = Reflect.getMetadata('filters', Controller) || [];
       const controllerPipes = Reflect.getMetadata('pipes', Controller) || [];
+      const controllerGuards = Reflect.getMetadata('guards', Controller) || [];
       for (let methodName of Object.getOwnPropertyNames(controllerPrototype)) {
         const method = controller[methodName]
         const pathMetadata = Reflect.getMetadata('path', method)
@@ -219,7 +241,8 @@ export class NestApplication {
         const headers = Reflect.getMetadata('headers', method) || [];
         const methodFilters = Reflect.getMetadata('filters', method) || [];
         const methodPipes = Reflect.getMetadata('pipes', method) || [];
-
+        const methodGuards = Reflect.getMetadata('guards', method) || [];
+        const guards = [...controllerGuards, ...methodGuards];
         const pipes = [...controllerPipes, ...methodPipes];
         if (httpMethod) {
           const routePath = path.posix.join('/', prefix, pathMetadata)
@@ -232,8 +255,13 @@ export class NestApplication {
                 getNext: () => next,
               }),
             };
+            const context: ExecutionContext = {
+              ...host,
+              getClass: () => Controller,
+              getHandler: () => method,
+            }
             try {
-
+              await this.callGuards(guards, context);
               // 解析方法参数
               const args = await Promise.all(this.resolveParams(controller, methodName, req, res, next, host, pipes))
 
@@ -362,7 +390,7 @@ export class NestApplication {
   async listen(port: number) {
     await this.initProviders();
     await this.initMiddlewares();
-    await this.init()
+    await this.initController(this.module);
     this.app.listen(port, () => {
       Logger.log(`Application is running on: http://localhost:${port}`, 'NestApplication');
     })
